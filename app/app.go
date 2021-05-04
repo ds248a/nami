@@ -6,7 +6,7 @@ type Nami struct {
 
 func NewNami() {
 	return &Nami{
-		A;5
+		A:5,
 	}
 }
 

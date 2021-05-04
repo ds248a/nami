@@ -1,8 +1,9 @@
 package main
 
-import(
+import (
+	"fmt"
+
 	"github.com/ds248a/nami/app"
-	
 )
 
 func main() {
