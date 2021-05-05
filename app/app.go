@@ -1,18 +1,23 @@
 package app
 
+import "fmt"
+
 var nami *Nami
 
 func init() {
+
+}
+
+func NewNami() {
+	if nami != nil {
+		fmt.Println("created")
+		return
+	}
+
+	fmt.Println("create")
 	nami = &Nami{
 		A: 2,
 		B: 2,
-	}
-}
-
-func NewNami() *Nami {
-	return &Nami{
-		A: 5,
-		B: 5,
 	}
 }
 

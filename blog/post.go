@@ -6,12 +6,14 @@ import (
 	"github.com/ds248a/nami/app"
 )
 
+type ModelBlog struct {
+}
+
 func InitPost() {
 
 }
 
 func Post() {
-	fmt.Println("post:", app.NamiA())
 	app.NamiPlus()
 	fmt.Println("post:", app.NamiA())
 }
