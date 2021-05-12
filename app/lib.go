@@ -1,6 +1,8 @@
 package app
 
 import (
+	//"github.com/ds248a/nami/config"
+	"fmt"
 	"strconv"
 )
 
@@ -44,4 +46,11 @@ func I3S(i uint32) string {
 
 func I6S(i uint64) string {
 	return strconv.FormatUint(i, 10)
+}
+
+func Debug(format string, args ...interface{}) {
+	if !cfg.Debug {
+		return
+	}
+	fmt.Printf(format+" \n", args...)
 }

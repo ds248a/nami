@@ -16,8 +16,8 @@ func (t *Controller) mainPage(c *gin.Context) {
 // данные хакера
 // принимает сообщение вида: /json/hacker?name='Alan Kay'
 func (t *Controller) hacker(c *gin.Context) {
-	name := string(c.Params.ByName("name"))
-	err := validate.Var(name, "required,gte=0,lte=50,excludesall=!$@#?%")
+	name := c.Query("name")
+	err := validate.Var(name, "required,gte=3,lte=50,excludesall=!$@#?%")
 	if err != nil {
 
 		// -- пример ведения лога

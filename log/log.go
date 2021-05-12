@@ -13,7 +13,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ds248a/air/config"
+	"github.com/ds248a/nami/config"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 

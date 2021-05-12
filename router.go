@@ -19,8 +19,8 @@ func (t *Controller) router(r *gin.Engine) {
 	r.GET("/new", t.hackerNew)
 	r.GET("/recover", t.hackerRecover)
 
-	r.NoMethod(t.notFound)
-	r.NoRoute(t.notFound)
+	//r.NoMethod(t.notFound)
+	//r.NoRoute(t.notFound)
 
 	// ***********************************
 	// ***  Подгововка списка хакеров  ***

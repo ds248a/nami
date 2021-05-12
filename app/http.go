@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ds248a/air/config"
-	lg "github.com/ds248a/air/log"
+	"github.com/ds248a/nami/config"
+	lg "github.com/ds248a/nami/log"
 	"github.com/gin-gonic/gin"
 )
 

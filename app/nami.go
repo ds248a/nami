@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ds248a/air/config"
-	lg "github.com/ds248a/air/log"
+	"github.com/ds248a/nami/config"
+	lg "github.com/ds248a/nami/log"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -65,8 +65,13 @@ func init() {
 
 // роутер приложения
 func Router() *gin.Engine {
-	return gin.Default() // debugPrintWARNINGDefault() + engine.Use(Logger(), Recovery())
-	// return gim.New()
+	gin.ForceConsoleColor()
+
+	if !cfg.Debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	// return gin.Default() // debugPrintWARNINGDefault() + engine.Use(Logger(), Recovery())
+	return gin.New()
 }
 
 // запуск HTTP сервера

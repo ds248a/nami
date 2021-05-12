@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/ds248a/air/app"
+	"github.com/ds248a/nami/app"
 	"github.com/go-playground/validator/v10"
 )
 
