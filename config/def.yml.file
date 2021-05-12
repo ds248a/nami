@@ -1,0 +1,18 @@
+#
+#  Redis
+#  Выгрузка лога в текстовый файл
+#
+debug: true
+server_addr: "172.16.10.211:8010"
+redis:
+  addrs:
+    server1: "172.16.10.211:6379"
+  db: 0
+  pool_size: 8
+postgre:
+  enable: false
+cache:
+  expiration: "10m"
+  cleanup: "15m"
+log:
+  format: "file"

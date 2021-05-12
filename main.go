@@ -1,23 +1,42 @@
 package main
 
 import (
-	"fmt"
+	"time"
 
-	"github.com/ds248a/nami/app"
-	"github.com/ds248a/nami/blog"
-	"github.com/ds248a/nami/db"
+	"github.com/ds248a/air/app"
+	"github.com/go-playground/validator/v10"
 )
 
+const (
+	sTimer time.Duration = 5 * time.Minute
+	mTimer time.Duration = 10 * time.Minute
+	lTimer time.Duration = 20 * time.Minute
+	xTimer time.Duration = 60 * time.Minute
+)
+
+var validate *validator.Validate
+
+func init() {
+	validate = validator.New()
+}
+
 func main() {
-	app.NewNami()
+	defer app.Close()
 
-	blog.Post()
+	cNami := Controller{
+		mHack: &HackerModel{
+			db: app.Redis(),
+			lc: app.Cache(),
+		},
+	}
 
-	app.NamiPlus()
-	fmt.Println("main:", app.NamiA())
+	r := app.Router()
+	r.LoadHTMLGlob("templates/*")
+	cNami.router(r)
 
-	app.NewNami()
+	// запуск HTTP сервера
+	app.StartHTTP(r)
 
-	db.Redis()
-	blog.Post()
+	// обработка прерываний сервера HTTP
+	app.Signal()
 }
