@@ -31,21 +31,6 @@ var lg *Logger
 //    Log Init
 // --------------------------------
 
-/*
-type Logger struct {
-	pdb   *pgxpool.Pool
-	file  *os.File
-	fname string
-
-	Ctx      context.Context
-	Cancel   context.CancelFunc
-	ChData   chan *dbLog
-	ChL      chan int
-	chBackup chan string
-	Closer   bool
-}
-*/
-
 func NewLog(cfg *config.Loger, pdb *pgxpool.Pool) error {
 	if _, ok := gLogFormat[cfg.Format]; !ok {
 		return errLogFormat

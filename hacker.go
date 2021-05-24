@@ -44,6 +44,7 @@ func (t *Controller) hackersList(c *gin.Context) {
 
 	if !ok {
 		c.JSON(http.StatusOK, gin.H{"error": "empty_list"})
+		
 		return
 	}
 

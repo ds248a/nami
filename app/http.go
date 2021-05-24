@@ -27,7 +27,7 @@ func NewServer(r *gin.Engine, cfg *config.Config) {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServeTLS("./sec/server.crt", "./sec/server.key"); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
 	}()
