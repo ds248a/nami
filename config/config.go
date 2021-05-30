@@ -25,8 +25,8 @@ type Config struct {
 	Redis     *RedisRing `yaml:"redis"`
 	Cache     *Cache     `yaml:"cache"`
 
-	Debug bool   `yaml:"debug"`
-	Loger *Loger `yaml:"log"`
+	Debug  bool    `yaml:"debug"`
+	Logger *Logger `yaml:"log"`
 }
 
 func init() {

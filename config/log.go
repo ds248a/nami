@@ -1,6 +1,6 @@
 package config
 
-type Loger struct {
+type Logger struct {
 	Format  string `yaml:"format"`
 	LogFile string `yaml:"log_file"`
 }

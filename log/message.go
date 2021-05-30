@@ -1,16 +1,16 @@
 package log
 
 import (
-	"fmt"
+	//"fmt"
 	"runtime"
 	"time"
 )
 
 // --------------------------------
-//    DB Log
+//    Message Log
 // --------------------------------
 
-type dbLog struct {
+type Message struct {
 	File string `db:"file" json:"file"`
 	Line int    `db:"line" json:"line"`
 	Fnct string `db:"function" json:"fnct"`
@@ -19,8 +19,9 @@ type dbLog struct {
 	Date int64  `db:"date" json:"date"`
 }
 
-func logNew(msg string) *dbLog {
-	l := &dbLog{Msg: msg}
+//func logNew(msg string) *dbLog {
+func newMessage(msg string) *Message {
+	l := &Message{Msg: msg}
 
 	pc, file, line, ok := runtime.Caller(2)
 	d := runtime.FuncForPC(pc)
@@ -34,24 +35,18 @@ func logNew(msg string) *dbLog {
 	return l
 }
 
-// --------------------------------
-
 // добавление параметров входящего запроса
-func (d *dbLog) Query(q string) {
+func (d *Message) Query(q string) {
 	d.Qry = q
 }
 
-// --------------------------------
-
 // вывод лога в терминал
-func (d *dbLog) Out() {
+func (d *Message) Out() {
 	logStd(d)
 }
 
-// --------------------------------
-
 // отправка лога в буферизированный канал с последующим сохранением
-func (d *dbLog) Save() {
+func (d *Message) Save() {
 	select {
 	case <-lg.Ctx.Done():
 		// Debug("  send Done err: %s \n", lg.Ctx.Err())
@@ -59,10 +54,4 @@ func (d *dbLog) Save() {
 	case lg.ChData <- d:
 		// Debug("send:%v len:%d \n", d, len(lg.ChData))
 	}
-}
-
-// --------------------------------
-
-func Debug(format string, args ...interface{}) {
-	fmt.Printf(format+" \n", args...)
 }

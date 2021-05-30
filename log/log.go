@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	//"io"
 	"os"
@@ -13,7 +14,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ds248a/nami/config"
+	// "github.com/ds248a/nami/config"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -23,40 +24,58 @@ var (
 	errLogFormat = errors.New("Error log format upload")
 	defFileMode  = os.FileMode(0644)
 	defFileFlag  = os.O_RDWR | os.O_CREATE | os.O_APPEND
+	sqlErrNoRows = "no rows in result set"
 )
 
 var lg *Logger
+
+func init() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	lg = &Logger{
+		Debug:    false,
+		format:   "file",
+		fname:    "./nami.log",
+		Ctx:      ctx,
+		Cancel:   cancel,
+		ChData:   make(chan *Message, 1000),
+		ChL:      make(chan int),
+		chBackup: make(chan string),
+		Closer:   false,
+	}
+
+	if err := lg.logOpen(); err != nil {
+		Fatal(err)
+	}
+
+	// запуск сборщика логов
+	go lg.logSave()
+}
 
 // --------------------------------
 //    Log Init
 // --------------------------------
 
-func NewLog(cfg *config.Loger, pdb *pgxpool.Pool) error {
+func Format() string {
+	return lg.format
+}
+
+// Регистрация настроек обработчика сообщений.
+// func NewLog(cfg *config.Logger, pdb *pgxpool.Pool) error {
+func NewLog(cfg *Config) error {
 	if _, ok := gLogFormat[cfg.Format]; !ok {
 		return errLogFormat
 	}
 
-	if cfg.Format == "postgre" && pdb == nil {
-		return errLogConDB
-	}
+	lg.Debug = cfg.Debug
+	lg.format = cfg.Format
 
-	file, fname, err := logOpen(cfg)
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	lg = &Logger{
-		pdb:      pdb,
-		file:     file,
-		fname:    fname,
-		Ctx:      ctx,
-		Cancel:   cancel,
-		ChData:   make(chan *dbLog, 1000),
-		ChL:      make(chan int),
-		chBackup: make(chan string),
-		Closer:   false,
+	// формат отправки соощений в базу данных Postgre
+	if cfg.Format == "postgre" {
+		if cfg.PDB == nil {
+			return errLogConDB
+		}
+		lg.pdb = cfg.PDB
 	}
 
 	// предварительная обработка лог файла
@@ -64,65 +83,10 @@ func NewLog(cfg *config.Loger, pdb *pgxpool.Pool) error {
 		return err
 	}
 
-	// запуск сборщика логов
-	go logSave(cfg.Format)
 	return nil
 }
 
-// --------------------------------
-
-func logOpen(cfg *config.Loger) (*os.File, string, error) {
-	fname := "./nami.log"
-	if len(cfg.LogFile) > 0 {
-		fname = cfg.LogFile
-	}
-
-	file, err := os.OpenFile(fname, defFileFlag, defFileMode)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return file, fname, nil
-}
-
-// --------------------------------
-
-func logSave(logFormat string) {
-	defer func() { lg.ChData = nil }()
-
-	for {
-		select {
-		case <-lg.Ctx.Done():
-			return
-
-		case d := <-lg.ChData:
-			// режим остановки приложения: данные сохраняются в текстовый файл
-			// данные из файла будут обработаны при следующем запуске сборщика логов
-			if lg.Closer {
-				logFile(d)
-				lg.ChL <- len(lg.ChData)
-
-			} else {
-				// плановое сохранение данных, в соответствии с конфигурацией
-				switch logFormat {
-				case "net":
-					logNet(d)
-				case "postgre":
-					logDb(d)
-				case "file":
-					logFile(d)
-				default:
-					logStd(d)
-				}
-
-			}
-		}
-	}
-}
-
-// --------------------------------
-
-// обработка завершения работы приложения
+// Обработка завершения работы приложения.
 func LogClose(ct context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -155,70 +119,72 @@ func LogClose(ct context.Context, wg *sync.WaitGroup) {
 //    Log
 // --------------------------------
 
-func LogMsg(msg string) *dbLog {
-	return logNew(msg)
+// Форматированный вывод отладочной информации.
+func Debug(format string, args ...interface{}) {
+	fmt.Printf(format+" \n", args...)
 }
 
-// --------------------------------
-
-func LogErr(err error) {
-	logNew(err.Error())
+// Эквивалентна выплению logStd(), с последующим вызовом os.Exit(1).
+func Fatal(err error) {
+	logStd(newMessage(err.Error()))
+	os.Exit(1)
 }
 
-// --------------------------------
+// Формирование сообщения о ошибке.
+func Msg(msg string) *Message {
+	return newMessage(msg)
+}
 
-func DbErr(err error) bool {
+// Формирование сообщения о ошибке.
+func Err(err error) *Message {
+	return newMessage(err.Error())
+}
+
+// Формирование сообщения в случае ошибки выполнения SQL запроса.
+func DbErr(err error) *Message {
 	if err != nil {
-		// err != sql.ErrNoRows
-		if err.Error() == `no rows in result set` {
-			return true
+		if err.Error() == sqlErrNoRows {
+			return nil
 		}
-		logNew(err.Error())
-		return true
+		return newMessage(err.Error())
 	}
-	return false
+	return nil
 }
 
-// --------------------------------
-
-func DbTxErr(ctx context.Context, tx *pgxpool.Tx, err error) bool {
+// В случае ошибки SQL запроса выполняется отмена транзакции,
+// с последующим формированием сообщения о ошибке.
+func DbTxErr(ctx context.Context, tx *pgxpool.Tx, err error) *Message {
 	if err != nil {
-		// err != sql.ErrNoRows
-		if err.Error() == `no rows in result set` {
-			return true
+		if err.Error() == sqlErrNoRows {
+			return nil
 		}
 		DbTxRollback(ctx, tx)
-		logNew(err.Error())
-		return true
+		return newMessage(err.Error())
 	}
-	return false
+	return nil
 }
 
-// --------------------------------
-
-func DbTxCommit(ctx context.Context, tx *pgxpool.Tx) bool {
+// Завершает текущую транзакцию или возвращает сообщение о ошибке.
+func DbTxCommit(ctx context.Context, tx *pgxpool.Tx) *Message {
 	if err := tx.Commit(ctx); err != nil {
-		logNew(err.Error())
-		return false
+		return newMessage(err.Error())
 	}
-	return true
+	return nil
 }
 
-// --------------------------------
-
+// Отменяет текущую транзакцию SQL запроса.
 func DbTxRollback(ctx context.Context, tx *pgxpool.Tx) {
 	if err := tx.Rollback(ctx); err != nil {
 		if err.Error() != `tx is closed` {
-			logNew(err.Error())
+			newMessage(err.Error()).Save()
 		}
 	}
 }
 
-// --------------------------------
-
+// Определяет, привел ли SQL запрос к появлению ошибки.
 func IsDbErr(err error) bool {
 	if err != nil {
-		if err.Error() == `no rows in result set` {
+		if err.Error() == sqlErrNoRows {
 			return false
 		}
 		return true
@@ -227,33 +193,17 @@ func IsDbErr(err error) bool {
 }
 
 // --------------------------------
-
-func DbErrValid(err error) (bool, bool) {
-	if err != nil {
-		if err.Error() == `no rows in result set` {
-			return false, false // совпадений не найдено && ошибок нет
-		}
-		logNew(err.Error())
-		return false, true // ошибка в параметрах запроса
-	}
-	return true, false // возможно обнаружено совпадение && ошибок нет
-}
-
-// --------------------------------
 //    Log Writer
 // --------------------------------
 
-// отправка записи сетевому сборщику
-func logNet(l *dbLog) {
-	// - ЗАГЛУШКА -
+// Отправка записи сетевому сборщику.
+func logNet(l *Message) {
 	// rpc.Dial()
 	Debug("logNet [%s] line:%d file:%s \nerr:%s", l.Fnct, l.Line, l.File, l.Msg)
 }
 
-// --------------------------------
-
-// регистрация записи в базе данных Postgre
-func logDb(l *dbLog) {
+// Регистрация записи в базе данных Postgre.
+func logDb(l *Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
 	defer cancel()
 	_, err := lg.pdb.Exec(ctx, `INSERT INTO main.log(file, line, function, message, datecreate) VALUES ($1, $2, $3, $4, $5)`, l.File, l.Line, l.Fnct, l.Msg, l.Date)
@@ -262,20 +212,16 @@ func logDb(l *dbLog) {
 	}
 }
 
-// --------------------------------
-
-// регистрация записи в текстовом файле
+// Регистрация записи в текстовом файле.
 func logFile(obj interface{}) {
 	fp := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&lg.file)))
 	file := (*os.File)(fp)
 	if err := json.NewEncoder(file).Encode(&obj); err != nil {
-		LogErr(err)
+		Fatal(err)
 	}
 }
 
-// --------------------------------
-
-// вывод сообщения в терминал
-func logStd(l *dbLog) {
+// Вывод сообщения в терминал.
+func logStd(l *Message) {
 	Debug("logStd [%s] line:%d file:%s \nerr:%s", l.Fnct, l.Line, l.File, l.Msg)
 }

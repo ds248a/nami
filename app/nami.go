@@ -113,7 +113,6 @@ func Close() {
 	}
 
 	// lg.LogMsg("test 3").Save()
-
 	wg.Wait()
 }
 
