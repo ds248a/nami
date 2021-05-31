@@ -1,20 +1,12 @@
 package log
 
 import (
-	//"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-
-	//"io"
 	"os"
 	"sync"
-	"sync/atomic"
-	"time"
-	"unsafe"
 
-	// "github.com/ds248a/nami/config"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -38,8 +30,8 @@ func init() {
 		fname:    "./nami.log",
 		Ctx:      ctx,
 		Cancel:   cancel,
-		ChData:   make(chan *Message, 1000),
-		ChL:      make(chan int),
+		ChMsg:    make(chan *Message, 1000),
+		ChLen:    make(chan int),
 		chBackup: make(chan string),
 		Closer:   false,
 	}
@@ -61,7 +53,6 @@ func Format() string {
 }
 
 // Регистрация настроек обработчика сообщений.
-// func NewLog(cfg *config.Logger, pdb *pgxpool.Pool) error {
 func NewLog(cfg *Config) error {
 	if _, ok := gLogFormat[cfg.Format]; !ok {
 		return errLogFormat
@@ -87,13 +78,13 @@ func NewLog(cfg *Config) error {
 }
 
 // Обработка завершения работы приложения.
-func LogClose(ct context.Context, wg *sync.WaitGroup) {
+func Close(ct context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	Debug("-- Log Close")
 	lg.Closer = true
 
-	if len(lg.ChData) > 0 {
+	if len(lg.ChMsg) > 0 {
 	loop:
 		for {
 			select {
@@ -101,7 +92,7 @@ func LogClose(ct context.Context, wg *sync.WaitGroup) {
 			case <-ct.Done():
 				break loop
 			// ожидание освобождения канала
-			case n := <-lg.ChL:
+			case n := <-lg.ChLen:
 				if n == 0 {
 					break loop
 				}
@@ -126,7 +117,7 @@ func Debug(format string, args ...interface{}) {
 
 // Эквивалентна выплению logStd(), с последующим вызовом os.Exit(1).
 func Fatal(err error) {
-	logStd(newMessage(err.Error()))
+	newMessage(err.Error()).logStd()
 	os.Exit(1)
 }
 
@@ -190,38 +181,4 @@ func IsDbErr(err error) bool {
 		return true
 	}
 	return false
-}
-
-// --------------------------------
-//    Log Writer
-// --------------------------------
-
-// Отправка записи сетевому сборщику.
-func logNet(l *Message) {
-	// rpc.Dial()
-	Debug("logNet [%s] line:%d file:%s \nerr:%s", l.Fnct, l.Line, l.File, l.Msg)
-}
-
-// Регистрация записи в базе данных Postgre.
-func logDb(l *Message) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
-	_, err := lg.pdb.Exec(ctx, `INSERT INTO main.log(file, line, function, message, datecreate) VALUES ($1, $2, $3, $4, $5)`, l.File, l.Line, l.Fnct, l.Msg, l.Date)
-	if IsDbErr(err) {
-		logFile(l)
-	}
-}
-
-// Регистрация записи в текстовом файле.
-func logFile(obj interface{}) {
-	fp := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&lg.file)))
-	file := (*os.File)(fp)
-	if err := json.NewEncoder(file).Encode(&obj); err != nil {
-		Fatal(err)
-	}
-}
-
-// Вывод сообщения в терминал.
-func logStd(l *Message) {
-	Debug("logStd [%s] line:%d file:%s \nerr:%s", l.Fnct, l.Line, l.File, l.Msg)
 }

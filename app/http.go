@@ -2,13 +2,12 @@ package app
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/ds248a/nami/config"
-	lg "github.com/ds248a/nami/log"
+	"github.com/ds248a/nami/log"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,7 +37,7 @@ func NewServer(r *gin.Engine, cfg *config.Config) {
 		dst := make(chan bool)
 		go func() {
 			if err := srv.Shutdown(ctx); err != nil {
-				lg.LogErr(err)
+				log.Err(err)
 			}
 			dst <- true
 			Debug("-- HTTP Close")

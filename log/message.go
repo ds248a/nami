@@ -2,8 +2,14 @@ package log
 
 import (
 	//"fmt"
+	"context"
+	"os"
 	"runtime"
 	"time"
+
+	"encoding/json"
+	"sync/atomic"
+	"unsafe"
 )
 
 // --------------------------------
@@ -19,39 +25,75 @@ type Message struct {
 	Date int64  `db:"date" json:"date"`
 }
 
-//func logNew(msg string) *dbLog {
+// Формирование сообщения лога, для последующего сохранения
 func newMessage(msg string) *Message {
-	l := &Message{Msg: msg}
+	m := &Message{Msg: msg}
 
 	pc, file, line, ok := runtime.Caller(2)
 	d := runtime.FuncForPC(pc)
 	if ok && d != nil {
-		l.File = file
-		l.Line = line
-		l.Fnct = d.Name()
-		l.Date = time.Now().Unix()
+		m.File = file
+		m.Line = line
+		m.Fnct = d.Name()
+		m.Date = time.Now().Unix()
 	}
 
-	return l
+	return m
 }
 
-// добавление параметров входящего запроса
-func (d *Message) Query(q string) {
-	d.Qry = q
+// Добавление параметров входящего запроса
+func (m *Message) Query(q string) {
+	m.Qry = q
 }
 
-// вывод лога в терминал
-func (d *Message) Out() {
-	logStd(d)
+// Вывод лога в терминал
+func (m *Message) Out() {
+	m.logStd()
 }
 
-// отправка лога в буферизированный канал с последующим сохранением
-func (d *Message) Save() {
+// Отправка лога в буферизированный канал с последующим сохранением
+func (m *Message) Save() {
 	select {
 	case <-lg.Ctx.Done():
 		// Debug("  send Done err: %s \n", lg.Ctx.Err())
 		//close(lg.ChData)
-	case lg.ChData <- d:
+	case lg.ChMsg <- m:
 		// Debug("send:%v len:%d \n", d, len(lg.ChData))
 	}
+}
+
+// --------------------------------
+//    Log Writer
+// --------------------------------
+
+// Отправка записи сетевому сборщику.
+func (m *Message) logNet() {
+	// rpc.Dial()
+	Debug("logNet [%s] line:%d file:%s \nerr:%s", m.Fnct, m.Line, m.File, m.Msg)
+}
+
+// Регистрация записи в базе данных Postgre.
+func (m *Message) logDb() {
+	Debug("logDb msg:%s", m.Msg)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
+	_, err := lg.pdb.Exec(ctx, `INSERT INTO main.log(file, line, function, message, datecreate) VALUES ($1, $2, $3, $4, $5)`, m.File, m.Line, m.Fnct, m.Msg, m.Date)
+	if IsDbErr(err) {
+		m.logFile()
+	}
+}
+
+// Регистрация записи в текстовом файле.
+func (m *Message) logFile() {
+	Debug("logFile msg:%s", m.Msg)
+	fp := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&lg.file)))
+	file := (*os.File)(fp)
+	if err := json.NewEncoder(file).Encode(&m); err != nil {
+		Fatal(err)
+	}
+}
+
+// Вывод сообщения в терминал.
+func (m *Message) logStd() {
+	Debug("logStd [%s] line:%d file:%s \nerr:%s", m.Fnct, m.Line, m.File, m.Msg)
 }

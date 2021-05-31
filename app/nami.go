@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ds248a/nami/config"
-	lg "github.com/ds248a/nami/log"
+	"github.com/ds248a/nami/log"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -36,6 +35,7 @@ func init() {
 
 	// Postgre
 	//if cfg.Postgre.Enable {
+	log.Msg("Postgre connect").Save()
 	if err = newPostgre(cfg.Postgre); err != nil {
 		log.Fatal(err)
 	}
@@ -52,11 +52,11 @@ func init() {
 	}
 
 	// log
-	if err = lg.NewLog(cfg.Loger, pdb); err != nil {
+	if err = log.NewLog(&log.Config{Debug: cfg.Debug, Format: cfg.Logger.Format, PDB: pdb}); err != nil {
 		log.Fatal(err)
 	}
 
-	callOnExit(lg.LogClose)
+	callOnExit(log.Close)
 }
 
 // --------------------------------
@@ -101,7 +101,7 @@ func Close() {
 	defer cancel()
 
 	// log.go - "test 2"
-	// lg.LogMsg("test 1").Save()
+	log.Msg("test 1").Save()
 
 	var wg sync.WaitGroup
 	wg.Add(len(onExit))
@@ -112,7 +112,7 @@ func Close() {
 		}(h)
 	}
 
-	// lg.LogMsg("test 3").Save()
+	log.Msg("test 3").Save()
 	wg.Wait()
 }
 

@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/ds248a/nami/config"
-	lg "github.com/ds248a/nami/log"
+	"github.com/ds248a/nami/log"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -34,7 +34,7 @@ func newRedis(cfg *config.RedisRing) error {
 		dst := make(chan bool)
 		go func(db *redis.Ring) {
 			if err := db.Close(); err != nil {
-				lg.LogErr(err)
+				log.Err(err)
 			}
 			dst <- true
 			Debug("-- Redis Close")

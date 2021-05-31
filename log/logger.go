@@ -30,14 +30,15 @@ type Logger struct {
 
 	Ctx      context.Context
 	Cancel   context.CancelFunc
-	ChData   chan *Message
-	ChL      chan int
+	ChMsg    chan *Message
+	ChLen    chan int
 	chBackup chan string
 	Closer   bool
 }
 
 // Открывает лог файл.
 func (l *Logger) logOpen() error {
+	Debug("logOpen")
 	file, err := os.OpenFile(l.fname, defFileFlag, defFileMode)
 	if err != nil {
 		return err
@@ -61,11 +62,13 @@ func (l *Logger) logRead(cfg *Config) error {
 		return nil
 	}
 
-	fback := l.fname + ".backup"
-	if err := os.Rename(l.fname, fback); err != nil {
+	// создание временного файла лога
+	fbackup := l.fname + ".backup"
+	if err := os.Rename(l.fname, fbackup); err != nil {
 		return err
 	}
 
+	// если конфигурация переопределяет файл лога
 	if len(cfg.LogFile) > 0 {
 		l.fname = cfg.LogFile
 	}
@@ -76,23 +79,30 @@ func (l *Logger) logRead(cfg *Config) error {
 		return err
 	}
 
-	oldFile := atomic.SwapPointer((*unsafe.Pointer)(unsafe.Pointer(&l.file)), unsafe.Pointer(newFile))
+	// атомарная подмена файла
+	oldFile := (*os.File)(atomic.SwapPointer((*unsafe.Pointer)(unsafe.Pointer(&l.file)), unsafe.Pointer(newFile)))
 
 	// выгрузка лог файла
 	go func() {
 		defer func() {
-			if err := (*os.File)(oldFile).Close(); err != nil {
+			if err := oldFile.Close(); err != nil {
 				Err(err).Save()
 			}
-			if err := os.Remove(fback); err != nil {
+			if err := os.Remove(fbackup); err != nil {
 				Err(err).Save()
 			}
 		}()
 
-		r := bufio.NewReader((*os.File)(oldFile))
+		if _, err = oldFile.Seek(0, 0); err != nil {
+			Err(err).Save()
+			return
+		}
+
+		r := bufio.NewReader(oldFile)
 
 		for {
 			line, err := r.ReadString('\n')
+
 			if err == io.EOF {
 				break
 			} else if err != nil {
@@ -116,31 +126,32 @@ func (l *Logger) logRead(cfg *Config) error {
 
 // Запрос на сохранение сообщения в соответствии с конфигурацией.
 func (l *Logger) logSave() {
-	defer func() { l.ChData = nil }()
+	defer func() { l.ChMsg = nil }()
 
 	for {
 		select {
 		case <-l.Ctx.Done():
 			return
 
-		case d := <-l.ChData:
+		case msg := <-l.ChMsg:
 			// режим остановки приложения: данные сохраняются в текстовый файл
 			// данные из файла будут обработаны при следующем запуске сборщика логов
 			if l.Closer {
-				logFile(d)
-				l.ChL <- len(l.ChData)
+				msg.logFile()
+				l.ChLen <- len(l.ChMsg)
 
 			} else {
+				Debug("logSave  format:%s  msg:%s", l.format, msg.Msg)
 				// плановое сохранение данных, в соответствии с конфигурацией
 				switch l.format {
 				case "net":
-					logNet(d)
+					msg.logNet()
 				case "postgre":
-					logDb(d)
+					msg.logDb()
 				case "file":
-					logFile(d)
+					msg.logFile()
 				default:
-					logStd(d)
+					msg.logStd()
 				}
 			}
 		}
