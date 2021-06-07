@@ -6,13 +6,23 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"strconv"
+	"time"
 
-	// "sync"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
-	// "github.com/ds248a/nami/config"
 	"github.com/jackc/pgx/v4/pgxpool"
+)
+
+const (
+	timeFormat = "2006/01/02 15:04:05"
+
+	Ltime      = 1 << iota // time format "2006/01/02 15:04:05"
+	Llongfile              // full file name and line number: /a/b/c/d.go:23
+	Lshortfile             // final file name element and line number: d.go:23. overrides Llongfile
+	LstdFlags  = Ltime | Lshortfile
 )
 
 // --------------------------------
@@ -20,13 +30,17 @@ import (
 // --------------------------------
 
 type Logger struct {
-	// mu sync.Mutex
-	Debug bool
+	mu sync.Mutex
 
-	format string
-	pdb    *pgxpool.Pool
-	file   *os.File
-	fname  string
+	Debug bool      // вывод в терминал отладочной информации
+	out   io.Writer // os.Strerr, по умолчанию
+	flag  int       // LstdFlags, по умолчанию
+	bufs  sync.Pool // буфер аварийного вывода. Используется при нарушении соединения определяемого параметром format
+
+	format string        // формат оправки сообщений: rpc, postgre, file
+	pdb    *pgxpool.Pool // соединение с базой данных Postgre
+	file   *os.File      // структура лог файла
+	fname  string        // путь лог файла
 
 	Ctx      context.Context
 	Cancel   context.CancelFunc
@@ -36,8 +50,17 @@ type Logger struct {
 	Closer   bool
 }
 
+// Задает аварийный поток вывода ошибок.
+// Используется при нарушении соединения определяемого параметром format.
+// По умолчанию используется os.Stderr
+func (l *Logger) SetOutput(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.out = w
+}
+
 // Открывает лог файл.
-func (l *Logger) logOpen() error {
+func (l *Logger) open() error {
 	Debug("logOpen")
 	file, err := os.OpenFile(l.fname, defFileFlag, defFileMode)
 	if err != nil {
@@ -48,18 +71,40 @@ func (l *Logger) logOpen() error {
 	return nil
 }
 
-// Обработка аварийного лог файла.
-func (l *Logger) logRead(cfg *Config) error {
-	if cfg.Format == "file" {
-		return nil
-	}
+// FileInfo лог файла
+func (l *Logger) Stat() (os.FileInfo, error) {
+	return l.file.Stat()
+}
 
-	fInfo, err := l.file.Stat()
+// Переименование лог файла
+func (l *Logger) rename(fname string) error {
+	_, err := l.file.Stat()
 	if err != nil {
 		return err
 	}
-	if fInfo.Size() == 0 {
-		return nil
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	err = l.file.Close()
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(l.fname, fname)
+	if err != nil {
+		return err
+	}
+
+	l.fname = fname
+	return lg.open()
+}
+
+// Обработка аварийного лог файла.
+func (l *Logger) read(cfg *Config) error {
+	_, err := l.file.Stat()
+	if err != nil {
+		return err
 	}
 
 	// создание временного файла лога
@@ -125,7 +170,7 @@ func (l *Logger) logRead(cfg *Config) error {
 }
 
 // Запрос на сохранение сообщения в соответствии с конфигурацией.
-func (l *Logger) logSave() {
+func (l *Logger) save() {
 	defer func() { l.ChMsg = nil }()
 
 	for {
@@ -137,7 +182,7 @@ func (l *Logger) logSave() {
 			// режим остановки приложения: данные сохраняются в текстовый файл
 			// данные из файла будут обработаны при следующем запуске сборщика логов
 			if l.Closer {
-				msg.logFile()
+				l.logFile(msg)
 				l.ChLen <- len(l.ChMsg)
 
 			} else {
@@ -145,15 +190,82 @@ func (l *Logger) logSave() {
 				// плановое сохранение данных, в соответствии с конфигурацией
 				switch l.format {
 				case "net":
-					msg.logNet()
+					l.logNet(msg)
 				case "postgre":
-					msg.logDb()
+					l.logDb(msg)
 				case "file":
-					msg.logFile()
+					l.logFile(msg)
 				default:
-					msg.logStd()
+					l.logOut(msg)
 				}
 			}
 		}
 	}
+}
+
+// --------------------------------
+//    Log Writer
+// --------------------------------
+
+// Отправка записи сетевому сборщику.
+func (l *Logger) logNet(m *Message) {
+	// rpc.Dial()
+	Debug("logNet [%s] line:%d file:%s \nerr:%s", m.Fnct, m.Line, m.File, m.Msg)
+}
+
+// Отправка записи в базе данных Postgre.
+func (l *Logger) logDb(m *Message) {
+	Debug("logDb msg:%s", m.Msg)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
+	_, err := l.pdb.Exec(ctx, `INSERT INTO main.log(file, line, function, message, datecreate) VALUES ($1, $2, $3, $4, $5)`, m.File, m.Line, m.Fnct, m.Msg, m.Date)
+	if IsDbErr(err) {
+		l.logFile(m)
+	}
+}
+
+// Регистрация записи в текстовом файле.
+func (l *Logger) logFile(m *Message) {
+	Debug("logFile msg:%s", m.Msg)
+	fp := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&lg.file)))
+	file := (*os.File)(fp)
+	if err := json.NewEncoder(file).Encode(&m); err != nil {
+		Fatal(err)
+	}
+}
+
+// Отправка сообщения в поток вывода.
+func (l *Logger) logOut(m *Message) error {
+	Debug("logOut msg:%s", m.Msg)
+
+	buf := l.bufs.Get().([]byte)
+	buf = buf[0:0]
+	defer l.bufs.Put(buf)
+
+	if l.flag&Ltime > 0 {
+		now := time.Now().Format(timeFormat)
+		buf = append(buf, '[')
+		buf = append(buf, now...)
+		buf = append(buf, "] "...)
+	}
+
+	if l.flag&(Lshortfile|Llongfile) != 0 {
+		buf = append(buf, m.File...)
+		buf = append(buf, ':')
+		buf = strconv.AppendInt(buf, int64(m.Line), 10)
+		buf = append(buf, ':')
+		buf = append(buf, m.Fnct...)
+		buf = append(buf, ' ')
+	}
+
+	buf = append(buf, m.Msg...)
+	if len(m.Msg) == 0 || m.Msg[len(m.Msg)-1] != '\n' {
+		buf = append(buf, '\n')
+	}
+
+	l.mu.Lock()
+	_, err := l.out.Write(buf)
+	l.mu.Unlock()
+
+	return err
 }

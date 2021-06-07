@@ -14,6 +14,7 @@ var (
 	gLogFormat   = map[string]uint8{"net": 1, "postgre": 1, "file": 1}
 	errLogConDB  = errors.New("Error connect to Log DB")
 	errLogFormat = errors.New("Error log format upload")
+	errLogFile   = errors.New("Error log file")
 	defFileMode  = os.FileMode(0644)
 	defFileFlag  = os.O_RDWR | os.O_CREATE | os.O_APPEND
 	sqlErrNoRows = "no rows in result set"
@@ -26,8 +27,10 @@ func init() {
 
 	lg = &Logger{
 		Debug:    false,
+		out:      os.Stderr,
+		flag:     LstdFlags,
 		format:   "file",
-		fname:    "./nami.log",
+		fname:    "nami.log",
 		Ctx:      ctx,
 		Cancel:   cancel,
 		ChMsg:    make(chan *Message, 1000),
@@ -36,12 +39,12 @@ func init() {
 		Closer:   false,
 	}
 
-	if err := lg.logOpen(); err != nil {
+	if err := lg.open(); err != nil {
 		Fatal(err)
 	}
 
 	// запуск сборщика логов
-	go lg.logSave()
+	go lg.save()
 }
 
 // --------------------------------
@@ -58,6 +61,7 @@ func NewLog(cfg *Config) error {
 		return errLogFormat
 	}
 
+	lg.mu.Lock()
 	lg.Debug = cfg.Debug
 	lg.format = cfg.Format
 
@@ -69,9 +73,22 @@ func NewLog(cfg *Config) error {
 		lg.pdb = cfg.PDB
 	}
 
-	// предварительная обработка лог файла
-	if err := lg.logRead(cfg); err != nil {
-		return err
+	lg.mu.Unlock()
+
+	// формат записи сообщений в текстовый файл
+	if cfg.Format == "file" {
+		if len(cfg.LogFile) > 0 {
+			// переименование лог файла
+			if err := lg.rename(cfg.LogFile); err != nil {
+				return err
+			}
+		}
+
+	} else {
+		// предварительная обработка лог файла
+		if err := lg.read(cfg); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -110,25 +127,28 @@ func Close(ct context.Context, wg *sync.WaitGroup) {
 //    Log
 // --------------------------------
 
+// Формирование сообщения о ошибке.
+func Err(err error) *Message {
+	if err == nil {
+		return nil
+	}
+	return newMessage(err.Error())
+}
+
+// Формирование сообщения на основе текстового сообщения.
+func Msg(msg string) *Message {
+	return newMessage(msg)
+}
+
 // Форматированный вывод отладочной информации.
 func Debug(format string, args ...interface{}) {
 	fmt.Printf(format+" \n", args...)
 }
 
-// Эквивалентна выплению logStd(), с последующим вызовом os.Exit(1).
+// Эквивалентна выполению logStd(), с последующим вызовом os.Exit(1).
 func Fatal(err error) {
-	newMessage(err.Error()).logStd()
+	lg.logOut(newMessage(err.Error()))
 	os.Exit(1)
-}
-
-// Формирование сообщения о ошибке.
-func Msg(msg string) *Message {
-	return newMessage(msg)
-}
-
-// Формирование сообщения о ошибке.
-func Err(err error) *Message {
-	return newMessage(err.Error())
 }
 
 // Формирование сообщения в случае ошибки выполнения SQL запроса.

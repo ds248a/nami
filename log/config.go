@@ -19,6 +19,16 @@ type Config struct {
 	// Соединение с БД Postgre.
 	PDB *pgxpool.Pool
 	// Путь к лог файлу.
-	// './nami.log' - значение по умодчанию.
+	// 'nami.log' - значение по умодчанию.
 	LogFile string
+}
+
+// По умолчанию сообщения сохряняются в текстовом файле 'nami.log'.
+// Ротация лог файла не предусмотрена.
+func NewDefaultConfig() *Config {
+	return &Config{
+		Debug:   false,
+		Format:  "file",
+		LogFile: "nami.log",
+	}
 }

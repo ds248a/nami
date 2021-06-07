@@ -2,14 +2,13 @@ package log
 
 import (
 	//"fmt"
-	"context"
-	"os"
+	//"context"
+	//"os"
+	"encoding/json"
 	"runtime"
 	"time"
-
-	"encoding/json"
-	"sync/atomic"
-	"unsafe"
+	//"sync/atomic"
+	//"unsafe"
 )
 
 // --------------------------------
@@ -21,34 +20,54 @@ type Message struct {
 	Line int    `db:"line" json:"line"`
 	Fnct string `db:"function" json:"fnct"`
 	Msg  string `db:"message" json:"msg"`
-	Qry  string `db:"query" json:"query"`
+	Qry  []byte `db:"query" json:"query"`
 	Date int64  `db:"date" json:"date"`
 }
 
 // Формирование сообщения лога, для последующего сохранения
 func newMessage(msg string) *Message {
-	m := &Message{Msg: msg}
+	m := &Message{Msg: msg, Date: time.Now().Unix()}
 
 	pc, file, line, ok := runtime.Caller(2)
 	d := runtime.FuncForPC(pc)
+
 	if ok && d != nil {
+		if lg.flag&(Lshortfile|Llongfile) != 0 {
+			if lg.flag&Lshortfile != 0 {
+				short := file
+				for i := len(file) - 1; i > 0; i-- {
+					if file[i] == '/' {
+						short = file[i+1:]
+						break
+					}
+				}
+				file = short
+			}
+		}
+
 		m.File = file
 		m.Line = line
 		m.Fnct = d.Name()
-		m.Date = time.Now().Unix()
+
+	} else {
+		m.File = "???"
+		m.Line = 0
 	}
 
 	return m
 }
 
 // Добавление параметров входящего запроса
-func (m *Message) Query(q string) {
-	m.Qry = q
+func (m *Message) Query(obj interface{}) *Message {
+	if qry, err := json.Marshal(&obj); err == nil {
+		m.Qry = qry
+	}
+	return m
 }
 
-// Вывод лога в терминал
+// Вывод лога в поток вывода
 func (m *Message) Out() {
-	m.logStd()
+	lg.logOut(m)
 }
 
 // Отправка лога в буферизированный канал с последующим сохранением
@@ -60,40 +79,4 @@ func (m *Message) Save() {
 	case lg.ChMsg <- m:
 		// Debug("send:%v len:%d \n", d, len(lg.ChData))
 	}
-}
-
-// --------------------------------
-//    Log Writer
-// --------------------------------
-
-// Отправка записи сетевому сборщику.
-func (m *Message) logNet() {
-	// rpc.Dial()
-	Debug("logNet [%s] line:%d file:%s \nerr:%s", m.Fnct, m.Line, m.File, m.Msg)
-}
-
-// Регистрация записи в базе данных Postgre.
-func (m *Message) logDb() {
-	Debug("logDb msg:%s", m.Msg)
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
-	_, err := lg.pdb.Exec(ctx, `INSERT INTO main.log(file, line, function, message, datecreate) VALUES ($1, $2, $3, $4, $5)`, m.File, m.Line, m.Fnct, m.Msg, m.Date)
-	if IsDbErr(err) {
-		m.logFile()
-	}
-}
-
-// Регистрация записи в текстовом файле.
-func (m *Message) logFile() {
-	Debug("logFile msg:%s", m.Msg)
-	fp := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&lg.file)))
-	file := (*os.File)(fp)
-	if err := json.NewEncoder(file).Encode(&m); err != nil {
-		Fatal(err)
-	}
-}
-
-// Вывод сообщения в терминал.
-func (m *Message) logStd() {
-	Debug("logStd [%s] line:%d file:%s \nerr:%s", m.Fnct, m.Line, m.File, m.Msg)
 }
