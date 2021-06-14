@@ -1,0 +1,4 @@
+{"file":"log_test.go","line":36,"fnct":"github.com/ds248a/nami/log.TestConfig.func1","msg":"test message 1","query":"eyJhIjoxLCJiIjowfQ==","date":1623681181}
+{"file":"log_test.go","line":43,"fnct":"github.com/ds248a/nami/log.TestConfig.func1","msg":"test message 2","query":"eyJhIjoyLCJiIjowfQ==","date":1623681181}
+{"file":"log_test.go","line":57,"fnct":"github.com/ds248a/nami/log.TestConfig.func2","msg":"test message 3","query":"eyJhIjozLCJiIjowfQ==","date":1623681181}
+{"file":"log_test.go","line":64,"fnct":"github.com/ds248a/nami/log.TestConfig.func2","msg":"test message 4","query":"eyJhIjo0LCJiIjowfQ==","date":1623681181}

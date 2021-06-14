@@ -12,11 +12,11 @@ type Q struct {
 	B int `json:"b"`
 }
 
-func fileConfig() *Config {
+func fileConfig(fname string) *Config {
 	return &Config{
 		Debug:   false,
 		Format:  "file",
-		LogFile: "test.log",
+		LogFile: fname,
 	}
 }
 
@@ -30,12 +30,17 @@ func logClear() {
 }
 
 func TestConfig(t *testing.T) {
+	logClear()
+
 	t.Run("Config: file format", func(t *testing.T) {
-		cfg := fileConfig()
+		Msg("test message 1").Query(&Q{A: 1}).Save()
+
+		cfg := fileConfig("test.log")
 		if err := NewLog(cfg); err != nil {
 			t.Fatal("error config", err)
 		}
 
+		Msg("test message 2").Query(&Q{A: 2}).Save()
 		s, err := lg.Stat()
 		if err != nil {
 			t.Fatal("error file info", err)
@@ -45,8 +50,31 @@ func TestConfig(t *testing.T) {
 			t.Errorf("expect %v, want %v", s.Name(), cfg.LogFile)
 		}
 
-		logClear()
+		time.Sleep(time.Millisecond * 200)
 	})
+
+	t.Run("Re-Config: file format", func(t *testing.T) {
+		Msg("test message 3").Query(&Q{A: 3}).Save()
+
+		cfg := fileConfig("nami.log")
+		if err := NewLog(cfg); err != nil {
+			t.Fatal("error config", err)
+		}
+
+		Msg("test message 4").Query(&Q{A: 4}).Save()
+		s, err := lg.Stat()
+		if err != nil {
+			t.Fatal("error file info", err)
+		}
+
+		if s.Name() != cfg.LogFile {
+			t.Errorf("expect %v, want %v", s.Name(), cfg.LogFile)
+		}
+
+		time.Sleep(time.Millisecond * 200)
+	})
+
+	// logClear()
 }
 
 func TestWrite(t *testing.T) {

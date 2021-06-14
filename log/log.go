@@ -57,6 +57,7 @@ func Format() string {
 
 // Регистрация настроек обработчика сообщений.
 func NewLog(cfg *Config) error {
+	Debug("-- NewLog")
 	if _, ok := gLogFormat[cfg.Format]; !ok {
 		return errLogFormat
 	}
@@ -64,16 +65,18 @@ func NewLog(cfg *Config) error {
 	lg.mu.Lock()
 	lg.Debug = cfg.Debug
 	lg.format = cfg.Format
+	lg.mu.Unlock()
 
 	// формат отправки соощений в базу данных Postgre
 	if cfg.Format == "postgre" {
 		if cfg.PDB == nil {
 			return errLogConDB
 		}
-		lg.pdb = cfg.PDB
-	}
 
-	lg.mu.Unlock()
+		lg.mu.Lock()
+		lg.pdb = cfg.PDB
+		lg.mu.Unlock()
+	}
 
 	// формат записи сообщений в текстовый файл
 	if cfg.Format == "file" {

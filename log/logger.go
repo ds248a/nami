@@ -59,9 +59,14 @@ func (l *Logger) SetOutput(w io.Writer) {
 	l.out = w
 }
 
+// FileInfo лог файла
+func (l *Logger) Stat() (os.FileInfo, error) {
+	return l.file.Stat()
+}
+
 // Открывает лог файл.
 func (l *Logger) open() error {
-	Debug("logOpen")
+	Debug("open")
 	file, err := os.OpenFile(l.fname, defFileFlag, defFileMode)
 	if err != nil {
 		return err
@@ -71,14 +76,10 @@ func (l *Logger) open() error {
 	return nil
 }
 
-// FileInfo лог файла
-func (l *Logger) Stat() (os.FileInfo, error) {
-	return l.file.Stat()
-}
-
 // Переименование лог файла
 func (l *Logger) rename(fname string) error {
-	_, err := l.file.Stat()
+	Debug("rename")
+	_, err := l.Stat()
 	if err != nil {
 		return err
 	}
@@ -97,12 +98,13 @@ func (l *Logger) rename(fname string) error {
 	}
 
 	l.fname = fname
-	return lg.open()
+	return l.open()
 }
 
 // Обработка аварийного лог файла.
 func (l *Logger) read(cfg *Config) error {
-	_, err := l.file.Stat()
+	Debug("read")
+	_, err := l.Stat()
 	if err != nil {
 		return err
 	}
@@ -227,9 +229,9 @@ func (l *Logger) logDb(m *Message) {
 // Регистрация записи в текстовом файле.
 func (l *Logger) logFile(m *Message) {
 	Debug("logFile msg:%s", m.Msg)
-	fp := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&lg.file)))
-	file := (*os.File)(fp)
-	if err := json.NewEncoder(file).Encode(&m); err != nil {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := json.NewEncoder(l.file).Encode(&m); err != nil {
 		Fatal(err)
 	}
 }
