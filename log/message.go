@@ -19,14 +19,17 @@ type Message struct {
 	File string `db:"file" json:"file"`
 	Line int    `db:"line" json:"line"`
 	Fnct string `db:"function" json:"fnct"`
-	Msg  string `db:"message" json:"msg"`
+	Msg  []byte `db:"message" json:"msg"`
 	Qry  []byte `db:"query" json:"query"`
 	Date int64  `db:"date" json:"date"`
 }
 
 // Формирование сообщения лога, для последующего сохранения
 func newMessage(msg string) *Message {
-	m := &Message{Msg: msg, Date: time.Now().Unix()}
+	m := &Message{
+		Msg:  []byte(msg),
+		Date: time.Now().Unix(),
+	}
 
 	pc, file, line, ok := runtime.Caller(2)
 	d := runtime.FuncForPC(pc)

@@ -33,14 +33,14 @@ func TestConfig(t *testing.T) {
 	logClear()
 
 	t.Run("Config: file format", func(t *testing.T) {
-		Msg("test message 1").Query(&Q{A: 1}).Save()
+		Msg("message 1").Query(&Q{A: 1}).Save()
 
 		cfg := fileConfig("test.log")
 		if err := NewLog(cfg); err != nil {
 			t.Fatal("error config", err)
 		}
 
-		Msg("test message 2").Query(&Q{A: 2}).Save()
+		Msg("message 2").Query(&Q{A: 2}).Save()
 		s, err := lg.Stat()
 		if err != nil {
 			t.Fatal("error file info", err)
@@ -54,14 +54,14 @@ func TestConfig(t *testing.T) {
 	})
 
 	t.Run("Re-Config: file format", func(t *testing.T) {
-		Msg("test message 3").Query(&Q{A: 3}).Save()
+		Msg("message 3").Query(&Q{A: 3}).Save()
 
 		cfg := fileConfig("nami.log")
 		if err := NewLog(cfg); err != nil {
 			t.Fatal("error config", err)
 		}
 
-		Msg("test message 4").Query(&Q{A: 4}).Save()
+		Msg("message 4").Query(&Q{A: 4}).Save()
 		s, err := lg.Stat()
 		if err != nil {
 			t.Fatal("error file info", err)
@@ -74,7 +74,18 @@ func TestConfig(t *testing.T) {
 		time.Sleep(time.Millisecond * 200)
 	})
 
-	// logClear()
+	t.Run("File format", func(t *testing.T) {
+		s, err := lg.Stat()
+		if err != nil {
+			t.Fatal("error file info", err)
+		}
+
+		if s.Size() == 0 {
+			t.Errorf("empty log file")
+		}
+
+		logClear()
+	})
 }
 
 func TestWrite(t *testing.T) {
@@ -93,6 +104,6 @@ func TestWrite(t *testing.T) {
 			t.Errorf("empty log file")
 		}
 
-		logClear()
+		// logClear()
 	})
 }
