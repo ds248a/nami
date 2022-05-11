@@ -2,81 +2,109 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"strconv"
+	// "strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
+type jHacker struct {
+	Count int    `form:"count" json:"count" xml:"count"` //   binding:"required"
+	Name  string `form:"name"  json:"name"  xml:"name"`
+}
+
 // главная страница
 func (t *Controller) mainPage(c *gin.Context) {
+	fmt.Println("mainPage")
 	c.HTML(http.StatusOK, "main_page.tmpl", gin.H{})
 }
 
+// обработка параметров запроса
+func hackerParse(c *gin.Context) (*jHacker, error) {
+	js := &jHacker{}
+	if err := c.ShouldBindJSON(js); err != nil {
+		return nil, err
+	}
+
+	if len(js.Name) > 0 {
+		if err := validate.Var(js.Name, "required,gte=3,lte=50,excludesall=!$@#?%"); err != nil {
+			return nil, err
+		}
+	}
+
+	fmt.Printf("%+v\n", js)
+
+	return js, nil
+}
+
+// список хакеров
+// POST /j/hackers
+func (t *Controller) hackersList(c *gin.Context) {
+	hl, ok := t.mHack.hackersList(context.Background())
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{"error": "empty_list"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": hl})
+}
+
 // данные хакера
-// принимает сообщение вида: /json/hacker?name='Alan Kay'
+// POST /j/hacker name='Alan Kay'
 func (t *Controller) hacker(c *gin.Context) {
-	name := c.Query("name")
-	err := validate.Var(name, "required,gte=3,lte=50,excludesall=!$@#?%")
+	js, err := hackerParse(c)
 	if err != nil {
-
-		// -- пример ведения лога
-		// lg.LogMsg("db err msg").Query("user: sairos").Save()
-		// lg.LogErr(err).Query("user: tomo").Save()
-
 		c.JSON(http.StatusOK, gin.H{"error": "name_not_valid"})
 		return
 	}
 
-	h, err := t.mHack.hacker(context.Background(), name)
+	// -- пример ведения лога
+	// lg.LogMsg("db err msg").Query("user: sairos").Save()
+	// lg.LogErr(err).Query("user: tomo").Save()
+
+	h, err := t.mHack.hacker(context.Background(), js.Name)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "empty_list"})
 		return
 	}
 
-	c.JSON(http.StatusOK, h)
-}
-
-// список хакеров
-// принимает сообщение вида: /json/hackers
-func (t *Controller) hackersList(c *gin.Context) {
-	hl, ok := t.mHack.hackersList(context.Background())
-
-	if !ok {
-		c.JSON(http.StatusOK, gin.H{"error": "empty_list"})
-		
-		return
-	}
-
-	c.JSON(http.StatusOK, hl)
+	c.JSON(http.StatusOK, gin.H{"data": h})
 }
 
 // создает заданное кол-во записей в наборе хакеров
-// принимает сообщение вида: /new?count=1000
+// POST /j/new count=5
 func (t *Controller) hackerNew(c *gin.Context) {
-	count, err := strconv.Atoi(string(c.Params.ByName("count")))
-	if err != nil || count < 1 || count > 10000 {
+	js, err := hackerParse(c)
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "count_not_valid"})
 		return
 	}
 
-	if err := t.mHack.hackerNew(context.Background(), count); err != nil {
+	if err := t.mHack.hackerNew(context.Background(), js.Count); err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "count_not_valid"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": true})
+	hl, ok := t.mHack.hackersList(context.Background())
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{"error": "empty_list"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": hl})
 }
 
 // восстановление списка хакеров
-// принимает сообщение вида: /recover
+// POST /j/recover
 func (t *Controller) hackerRecover(c *gin.Context) {
-	if err := t.mHack.hackerRecover(context.Background()); err != nil {
+	hl, err := t.mHack.hackerRecover(context.Background())
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "hacker_recover"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": true})
+	c.JSON(http.StatusOK, gin.H{"data": hl})
 }
 
 func (t *Controller) notFound(c *gin.Context) {

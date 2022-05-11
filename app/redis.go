@@ -23,6 +23,10 @@ func newRedis(cfg *config.RedisRing) error {
 		return errRedisConfig
 	}
 
+	if !cfg.Enable {
+		return nil
+	}
+
 	rdb = redis.NewRing(cfg.Options())
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
 		return err

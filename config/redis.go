@@ -11,6 +11,7 @@ import (
 // -------------------------------------
 
 type RedisRing struct {
+	Enable       bool              `yaml:"enable"`
 	Addrs        map[string]string `yaml:"addrs"`
 	Password     string            `yaml:"password"`
 	DB           int               `yaml:"db"`

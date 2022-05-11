@@ -103,7 +103,7 @@ func (m *HackerModel) hackerNew(ctx context.Context, count int) error {
 }
 
 // очистка списка хакеров
-func (m *HackerModel) hackerRecover(ctx context.Context) error {
+func (m *HackerModel) hackerRecover(ctx context.Context) ([]*dbHacker, error) {
 	m.lc.Delete(`hl`)
 
 	hl := []*dbHacker{
@@ -117,7 +117,7 @@ func (m *HackerModel) hackerRecover(ctx context.Context) error {
 
 	err := m.db.Del(ctx, "hackers").Err()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	pipe := m.db.TxPipeline()
@@ -132,9 +132,9 @@ func (m *HackerModel) hackerRecover(ctx context.Context) error {
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m.lc.Set(`hl`, hl, mTimer)
-	return nil
+	return hl, nil
 }

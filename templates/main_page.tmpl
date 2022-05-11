@@ -1,8 +1,13 @@
+{{define "main_page.tmpl" -}}
 <html>
-<h2>Nami</h2>
-<a href="/">main page</a><br>
-<a href="/json/hackers">hacker list</a><br>
-<a href="/json/hacker?name='name_1'">hacker param</a><br>
-<a href="/new">new list</a><br>
-<a href="/clear">clear list</a><br>
+<head>
+<link href="/assets/css/m.css" rel="stylesheet" type="text/css" media="all" />
+<title>Nami</title>
+</head>
+<body>
+<div class="page" id="nami"></div>
+{{if .CSRA }}<input type="hidden" id="csra" value="{{ .CSRA }}">{{end}}
+<script src="/assets/js/m.js" srt="acc" type="text/javascript"></script>
+</body>
 </html>
+{{- end}}

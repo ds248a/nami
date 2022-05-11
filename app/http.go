@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ func NewServer(r *gin.Engine, cfg *config.Config) {
 
 	go func() {
 		if err := srv.ListenAndServeTLS("./sec/server.crt", "./sec/server.key"); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("err:%v \n", err)
 			log.Fatal(err)
 		}
 	}()

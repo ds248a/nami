@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	sTimer time.Duration = 5  * time.Minute
+	sTimer time.Duration = 5 * time.Minute
 	mTimer time.Duration = 10 * time.Minute
 	lTimer time.Duration = 20 * time.Minute
 	xTimer time.Duration = 60 * time.Minute
@@ -32,6 +32,7 @@ func main() {
 
 	r := app.Router()
 	r.LoadHTMLGlob("templates/*")
+	r.Static("/assets", "./assets")
 	cNami.router(r)
 
 	// запуск HTTP сервера

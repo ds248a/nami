@@ -14,10 +14,10 @@ type Controller struct {
 
 func (t *Controller) router(r *gin.Engine) {
 	r.GET("/", t.mainPage)
-	r.GET("/json/hackers", t.hackersList)
-	r.GET("/json/hacker", t.hacker)
-	r.GET("/new", t.hackerNew)
-	r.GET("/recover", t.hackerRecover)
+	r.POST("/j/hackers", t.hackersList)
+	r.POST("/j/hacker", t.hacker)
+	r.POST("/j/new", t.hackerNew)
+	r.POST("/j/recover", t.hackerRecover)
 
 	//r.NoMethod(t.notFound)
 	//r.NoRoute(t.notFound)
