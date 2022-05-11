@@ -70,8 +70,11 @@ func Router() *gin.Engine {
 	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	// return gin.Default() // debugPrintWARNINGDefault() + engine.Use(Logger(), Recovery())
-	return gin.New()
+
+	r := gin.New()
+	// r.SetTrustedProxies([]string{"192.168.1.2"})
+	r.SetTrustedProxies(nil) // no proxy
+	return r
 }
 
 // запуск HTTP сервера

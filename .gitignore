@@ -1,5 +1,8 @@
 # Binaries for programs and plugins
 *~
+*.log
 *.sublime*
+.air*
 .git/
+tmp/
 vendor/
