@@ -15,6 +15,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/patrickmn/go-cache"
+	"github.com/unrolled/secure"
 )
 
 var (
@@ -76,8 +77,41 @@ func Router() *gin.Engine {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	secureMiddleware := secure.New(secure.Options{
+		HostsProxyHeaders: []string{"X-Forwarded-Host"},
+		SSLProxyHeaders:   map[string]string{"X-Forwarded-Proto": "https"},
+		// SSLHost:       "localhost:8443"
+		// IsDevelopment: !a.isProduction(),
+		ForceSTSHeader:        true,
+		STSSeconds:            31536000,
+		STSIncludeSubdomains:  true,
+		STSPreload:            true,
+		FrameDeny:             true,
+		ContentTypeNosniff:    true,
+		BrowserXssFilter:      true,
+		ContentSecurityPolicy: "base-uri 'self'",
+		ReferrerPolicy:        "same-origin",
+		PermissionsPolicy:     "fullscreen=*",
+	})
+
+	secureFunc := func() gin.HandlerFunc {
+		return func(c *gin.Context) {
+			err := secureMiddleware.Process(c.Writer, c.Request)
+			if err != nil {
+				c.Abort()
+				return
+			}
+
+			// Исключаем перезаписи заголовка, если ответ является перенаправлением
+			if status := c.Writer.Status(); status > 300 && status < 399 {
+				c.Abort()
+			}
+		}
+	}()
+
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(secureFunc)
 
 	// Список резрешенный прокси-серверов
 	// []string{"172.16.0.10"} - пример списа

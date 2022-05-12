@@ -9,6 +9,7 @@ require (
 	github.com/jackc/pgx/v4 v4.11.0
 	github.com/onsi/ginkgo v1.16.1 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/unrolled/secure v1.10.0
 	golang.org/x/sys v0.0.0-20210423185535-09eb48e85fd7 // indirect
 	golang.org/x/text v0.3.5 // indirect
 	gopkg.in/yaml.v2 v2.4.0
