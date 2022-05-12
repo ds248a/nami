@@ -18,6 +18,7 @@ var (
 //    Redis
 // --------------------------------
 
+// Регистрация соединения с Redis.
 func newRedis(cfg *config.RedisRing) error {
 	if cfg == nil {
 		return errRedisConfig

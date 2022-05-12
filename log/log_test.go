@@ -26,7 +26,7 @@ func logClear() {
 
 	lg.file.Close()
 	os.Remove(lg.fname)
-	lg.open()
+	lg.open(lg.fname)
 }
 
 func TestConfig(t *testing.T) {

@@ -1,14 +1,11 @@
 package log
 
 import (
-	//"fmt"
-	//"context"
-	//"os"
 	"encoding/json"
+	"fmt"
+	"os"
 	"runtime"
 	"time"
-	//"sync/atomic"
-	//"unsafe"
 )
 
 // --------------------------------
@@ -78,8 +75,35 @@ func (m *Message) Save() {
 	select {
 	case <-lg.Ctx.Done():
 		// Debug("  send Done err: %s \n", lg.Ctx.Err())
-		//close(lg.ChData)
 	case lg.ChMsg <- m:
 		// Debug("send:%v len:%d \n", d, len(lg.ChData))
 	}
+}
+
+// --------------------------------
+//    Log
+// --------------------------------
+
+// Формирование сообщения на основе текстового сообщения.
+func Msg(msg string) *Message {
+	return newMessage(msg)
+}
+
+// Формирование сообщения о ошибке.
+func Err(err error) *Message {
+	if err == nil {
+		return nil
+	}
+	return newMessage(err.Error())
+}
+
+// Эквивалентна выполению logStd(), с последующим вызовом os.Exit(1).
+func Fatal(err error) {
+	lg.logOut(newMessage(err.Error()))
+	os.Exit(1)
+}
+
+// Форматированный вывод отладочной информации.
+func Debug(format string, args ...interface{}) {
+	fmt.Printf(format+" \n", args...)
 }

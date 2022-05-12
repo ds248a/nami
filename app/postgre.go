@@ -23,6 +23,7 @@ var (
 //    Postgre
 // --------------------------------
 
+// Регистрация соединений с Postgres.
 func newPostgre(cfg *config.Postgre) error {
 	if cfg == nil {
 		return errPostgreConfig

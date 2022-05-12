@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/ds248a/nami/log"
 	"github.com/go-redis/redis/v8"
 	"github.com/patrickmn/go-cache"
 )
@@ -40,6 +41,7 @@ func (m *HackerModel) hacker(ctx context.Context, name string) (*dbHacker, error
 	rank := pipe.ZRank(ctx, "hackers", name)
 	_, err := pipe.Exec(ctx)
 	if err != nil {
+		log.Err(err).Query(name).Save()
 		return nil, err
 	}
 	if score == nil {
@@ -96,6 +98,7 @@ func (m *HackerModel) hackerNew(ctx context.Context, count int) error {
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
+		log.Err(err).Query(count).Save()
 		return err
 	}
 
@@ -117,6 +120,7 @@ func (m *HackerModel) hackerRecover(ctx context.Context) ([]*dbHacker, error) {
 
 	err := m.db.Del(ctx, "hackers").Err()
 	if err != nil {
+		log.Err(err).Query("del hackers db").Save()
 		return nil, err
 	}
 
@@ -132,6 +136,7 @@ func (m *HackerModel) hackerRecover(ctx context.Context) ([]*dbHacker, error) {
 
 	_, err = pipe.Exec(ctx)
 	if err != nil {
+		log.Err(err).Save()
 		return nil, err
 	}
 

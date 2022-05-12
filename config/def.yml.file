@@ -16,3 +16,4 @@ cache:
   cleanup: "15m"
 log:
   format: "file"
+  log_file: "nami.log"

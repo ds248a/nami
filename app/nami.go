@@ -26,44 +26,49 @@ var (
 )
 
 func init() {
-	// загрузка конфигурационного файла
+	// Загрузка конфигурационного файла
 	cf, err := config.LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 	cfg = cf
 
-	// Postgre
-	//if cfg.Postgre.Enable {
-	log.Msg("Postgre connect").Save()
-	if err = newPostgre(cfg.Postgre); err != nil {
+	// Log
+	if err = log.NewLog(
+		&log.Config{
+			Debug:   cfg.Debug,
+			Format:  cfg.Logger.Format,
+			LogFile: cfg.Logger.LogFile,
+		}); err != nil {
 		log.Fatal(err)
 	}
-	//}
-
-	// Redis DB
-	if err = newRedis(cfg.Redis); err != nil {
-		log.Fatal(err)
-	}
+	callOnExit(log.Close)
 
 	// Local Cache
 	if err = newCache(cfg.Cache); err != nil {
 		log.Fatal(err)
 	}
 
-	// log
-	if err = log.NewLog(&log.Config{Debug: cfg.Debug, Format: cfg.Logger.Format, PDB: pdb}); err != nil {
-		log.Fatal(err)
+	// Postgre
+	if cfg.Postgre.Enable {
+		if err = newPostgre(cfg.Postgre); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	callOnExit(log.Close)
+	// Redis DB
+	if cfg.Redis.Enable {
+		if err = newRedis(cfg.Redis); err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
 // --------------------------------
 //    Nami
 // --------------------------------
 
-// роутер приложения
+// Роутер приложения.
 func Router() *gin.Engine {
 	gin.ForceConsoleColor()
 
@@ -72,12 +77,16 @@ func Router() *gin.Engine {
 	}
 
 	r := gin.New()
-	// r.SetTrustedProxies([]string{"192.168.1.2"})
+	r.Use(gin.Recovery())
+
+	// Список резрешенный прокси-серверов
+	// []string{"172.16.0.10"} - пример списа
+	// nil - если не используются
 	r.SetTrustedProxies(nil) // no proxy
 	return r
 }
 
-// запуск HTTP сервера
+// Запуск HTTP сервера.
 func StartHTTP(r *gin.Engine) {
 	NewServer(r, cfg)
 }
@@ -90,20 +99,19 @@ type hookFn func(context.Context, *sync.WaitGroup)
 
 var onExit []hookFn
 
-// обработка прерываний сервера HTTP
-// список значений: os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT
+// Обработка прерываний сервера HTTP.
+// Список значений: os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT
 func Signal() os.Signal {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	return <-sigint
 }
 
-// закрытие открытых соединений с ограничением по времени исполнения
+// Закрытие открытых соединений с ограничением по времени исполнения.
 func Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// log.go - "test 2"
 	log.Msg("test 1").Save()
 
 	var wg sync.WaitGroup

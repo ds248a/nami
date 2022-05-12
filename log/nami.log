@@ -1,6 +1,0 @@
-{"file":"log_test.go","line":93,"fnct":"github.com/ds248a/nami/log.TestWrite.func1","msg":"test message","query":"eyJhIjoxLCJiIjowfQ==","date":1623685652}
-{"file":"log_test.go","line":94,"fnct":"github.com/ds248a/nami/log.TestWrite.func1","msg":"test err","query":"eyJhIjowLCJiIjoyfQ==","date":1623685652}
-{"file":"log_test.go","line":93,"fnct":"github.com/ds248a/nami/log.TestWrite.func1","msg":"dGVzdCBtZXNzYWdl","query":"eyJhIjoxLCJiIjowfQ==","date":1623686338}
-{"file":"log_test.go","line":94,"fnct":"github.com/ds248a/nami/log.TestWrite.func1","msg":"dGVzdCBlcnI=","query":"eyJhIjowLCJiIjoyfQ==","date":1623686338}
-{"file":"log_test.go","line":93,"fnct":"github.com/ds248a/nami/log.TestWrite.func1","msg":"dGVzdCBtZXNzYWdl","query":"eyJhIjoxLCJiIjowfQ==","date":1623686460}
-{"file":"log_test.go","line":94,"fnct":"github.com/ds248a/nami/log.TestWrite.func1","msg":"dGVzdCBlcnI=","query":"eyJhIjowLCJiIjoyfQ==","date":1623686460}

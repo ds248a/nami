@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/ds248a/nami/config"
-	//"github.com/ds248a/nami/log"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -18,6 +17,7 @@ var (
 //    Local Cache
 // --------------------------------
 
+// Создание локального in-memory кеша.
 func newCache(cfg *config.Cache) error {
 	if cfg == nil {
 		return errCacheConfig

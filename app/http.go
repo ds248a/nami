@@ -16,7 +16,7 @@ import (
 //    Gin Server
 // --------------------------------
 
-// HTTP Server
+// Запуск HTTP сервера.
 func NewServer(r *gin.Engine, cfg *config.Config) {
 	srv = &http.Server{
 		Addr:           cfg.ServerAdr,

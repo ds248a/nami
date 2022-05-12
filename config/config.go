@@ -29,10 +29,13 @@ type Config struct {
 	Logger *Logger `yaml:"log"`
 }
 
+// Инициализвция параметров обработки конфигурационного файла
+// переданные в коммандном режиме.
 func init() {
 	flag.Parse()
 }
 
+// Загрузка конфигурационного файла.
 func LoadConfig() (*Config, error) {
 	return loadConfigEnv(*appDirFlag, *envFlag)
 }
@@ -80,23 +83,3 @@ func parseConfig(b []byte) (*Config, error) {
 	}
 	return cfg, nil
 }
-
-/*
-debug: true
-server_addr: "172.16.10.211:8010"
-redis:
-  addrs:
-    server1: "172.16.10.211:6379"
-  db: 0
-  pool_size: 8
-postgre:
-  host: "172.16.10.211"
-  port: "5432"
-  pool_max_conns: 5
-cache:
-  expiration: "10m"
-  cleanup: "15m"
-log:
-  format: "postgre"
-  table: "log"
-*/

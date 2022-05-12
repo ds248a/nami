@@ -23,10 +23,39 @@ const (
 	Llongfile              // full file name and line number: /a/b/c/d.go:23
 	Lshortfile             // final file name element and line number: d.go:23. overrides Llongfile
 	LstdFlags  = Ltime | Lshortfile
+
+	defFileMode = os.FileMode(0644)
+	defFileFlag = os.O_RDWR | os.O_CREATE | os.O_APPEND
+
+	defFormat   = "std"
+	defFileName = "nami.log"
 )
 
+var lg *Logger
+
+func init() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	lg = &Logger{
+		Debug:    false,
+		out:      os.Stderr,
+		flag:     LstdFlags,
+		format:   defFormat,
+		fname:    defFileName,
+		Ctx:      ctx,
+		Cancel:   cancel,
+		ChMsg:    make(chan *Message, 1000),
+		ChLen:    make(chan int),
+		chBackup: make(chan string),
+		Closer:   false,
+	}
+
+	// запуск сборщика логов
+	go lg.save()
+}
+
 // --------------------------------
-//    Log
+//    Logger
 // --------------------------------
 
 type Logger struct {
@@ -65,13 +94,14 @@ func (l *Logger) Stat() (os.FileInfo, error) {
 }
 
 // Открывает лог файл.
-func (l *Logger) open() error {
+func (l *Logger) open(fname string) error {
 	Debug("open")
-	file, err := os.OpenFile(l.fname, defFileFlag, defFileMode)
+	file, err := os.OpenFile(fname, defFileFlag, defFileMode)
 	if err != nil {
 		return err
 	}
 
+	l.fname = fname
 	l.file = file
 	return nil
 }
@@ -84,9 +114,6 @@ func (l *Logger) rename(fname string) error {
 		return err
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	err = l.file.Close()
 	if err != nil {
 		return err
@@ -97,8 +124,7 @@ func (l *Logger) rename(fname string) error {
 		return err
 	}
 
-	l.fname = fname
-	return l.open()
+	return l.open(fname)
 }
 
 // Обработка аварийного лог файла.
@@ -193,8 +219,6 @@ func (l *Logger) save() {
 				switch l.format {
 				case "net":
 					l.logNet(msg)
-				case "postgre":
-					l.logDb(msg)
 				case "file":
 					l.logFile(msg)
 				default:
@@ -213,17 +237,6 @@ func (l *Logger) save() {
 func (l *Logger) logNet(m *Message) {
 	// rpc.Dial()
 	Debug("logNet [%s] line:%d file:%s \nerr:%s", m.Fnct, m.Line, m.File, m.Msg)
-}
-
-// Отправка записи в базе данных Postgre.
-func (l *Logger) logDb(m *Message) {
-	Debug("logDb msg:%s", m.Msg)
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
-	defer cancel()
-	_, err := l.pdb.Exec(ctx, `INSERT INTO main.log(file, line, function, message, datecreate) VALUES ($1, $2, $3, $4, $5)`, m.File, m.Line, m.Fnct, m.Msg, m.Date)
-	if IsDbErr(err) {
-		l.logFile(m)
-	}
 }
 
 // Регистрация записи в текстовом файле.

@@ -5,20 +5,16 @@ import (
 	"time"
 )
 
-// time.Minute
+// Параметры времени указывать в секундах.
 
-var (
+const (
 	cacheExpire = time.Second * 600
 	cacheClean  = time.Second * 900
 )
 
-// -------------------------------------
-// параметры времени указывать в секундах
-// -------------------------------------
-
 type Cache struct {
-	ExpTimeout   string `yaml:"expiration"` // "10m"
-	CleanTimeout string `yaml:"cleanup"`    // "15m"
+	ExpTimeout   string `yaml:"expiration"`
+	CleanTimeout string `yaml:"cleanup"`
 	Expire       time.Duration
 	Clean        time.Duration
 }
