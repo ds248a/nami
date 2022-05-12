@@ -6,6 +6,7 @@ import (
 	"net/http"
 	// "strconv"
 
+	"github.com/ds248a/nami/log"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,16 +25,16 @@ func (t *Controller) mainPage(c *gin.Context) {
 func hackerParse(c *gin.Context) (*jHacker, error) {
 	js := &jHacker{}
 	if err := c.ShouldBindJSON(js); err != nil {
+		log.Err(err).Save()
 		return nil, err
 	}
 
 	if len(js.Name) > 0 {
 		if err := validate.Var(js.Name, "required,gte=3,lte=50,excludesall=!$@#?%"); err != nil {
+			log.Err(err).Query(js.Name).Save()
 			return nil, err
 		}
 	}
-
-	fmt.Printf("%+v\n", js)
 
 	return js, nil
 }
@@ -58,10 +59,6 @@ func (t *Controller) hacker(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"error": "name_not_valid"})
 		return
 	}
-
-	// -- пример ведения лога
-	// lg.LogMsg("db err msg").Query("user: sairos").Save()
-	// lg.LogErr(err).Query("user: tomo").Save()
 
 	h, err := t.mHack.hacker(context.Background(), js.Name)
 	if err != nil {
